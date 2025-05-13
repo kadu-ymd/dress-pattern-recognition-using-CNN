@@ -177,4 +177,5 @@ cython_debug/
 /dataset_category
 /manipulated_data
 /images
-/dataset_test
+/dataset_train*
+/dataset_test*
