@@ -174,8 +174,7 @@ cython_debug/
 .pypirc
 
 # outras pastas
-/dataset_category
 /manipulated_data
 /images
-/dataset_train*
-/dataset_test*
+/preprocessed
+/dataset*
