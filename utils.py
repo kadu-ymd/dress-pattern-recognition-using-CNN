@@ -9,7 +9,12 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 import os
 import shutil
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
+from sklearn.preprocessing import LabelBinarizer
+import numpy as np
 
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class CNNModel(nn.Module):
     """Classe destinada a criação do modelo de CNN a ser treinado e testado.
@@ -179,3 +184,80 @@ def test_model(model: CNNModel, model_weights: str, test_loader: DataLoader):
     result[model_weights] = 100 * correct / total
 
     return result
+
+def test_model_full_metrics(model: CNNModel, model_weights_path: str, test_loader: DataLoader, class_names: list = None, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    """
+    Testa o modelo com um determinado `test_loader` e calcula diversas métricas de classificação.
+
+    Args:
+        `model` (CNNModel): Instância do modelo a ser testado (deve ter a arquitetura do modelo treinado).
+        `model_weights_path` (str): Caminho para o arquivo .pth contendo os pesos do modelo treinado.
+        `test_loader` (DataLoader): DataLoader com as imagens e categorias atribuídas a elas.
+        `class_names` (list, optional): Lista de nomes das classes para melhor visualização da matriz de confusão.
+                                        Se não for fornecida, a matriz usará índices numéricos.
+
+    Returns:
+        `results` (dict): Dicionário contendo várias métricas de desempenho do modelo.
+    """
+    model.load_state_dict(torch.load(model_weights_path, map_location=device))
+
+    model.to(device)
+
+    model.eval()
+
+    all_predictions = []
+    all_true_labels = []
+    all_probabilities = []
+
+    with torch.no_grad():
+        for images, labels in test_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images)
+            
+            probabilities = F.softmax(outputs, dim=1) 
+            
+            _, predicted = torch.max(outputs, 1)
+
+            all_predictions.extend(predicted.cpu().numpy())
+            all_true_labels.extend(labels.cpu().numpy())
+            all_probabilities.extend(probabilities.cpu().numpy())
+
+    all_predictions = np.array(all_predictions)
+    all_true_labels = np.array(all_true_labels)
+    all_probabilities = np.array(all_probabilities)
+
+    accuracy = accuracy_score(all_true_labels, all_predictions)
+    
+    precision = precision_score(all_true_labels, all_predictions, average='macro', zero_division=0)
+    recall = recall_score(all_true_labels, all_predictions, average='macro', zero_division=0)
+    f1 = f1_score(all_true_labels, all_predictions, average='macro', zero_division=0)
+    
+    conf_matrix = confusion_matrix(all_true_labels, all_predictions)
+
+    results = {
+        "model_weights": model_weights_path,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1,
+        "confusion_matrix": conf_matrix
+    }
+
+    if len(np.unique(all_true_labels)) == 2:
+        results["roc_auc"] = roc_auc_score(all_true_labels, all_probabilities[:, 1])
+
+    elif len(np.unique(all_true_labels)) > 2:
+        lb = LabelBinarizer()
+        lb.fit(all_true_labels)
+        all_true_labels_one_hot = lb.transform(all_true_labels)
+
+        try:
+            results["roc_auc_ovr"] = roc_auc_score(all_true_labels_one_hot, all_probabilities, multi_class='ovr', average='macro')
+
+        except ValueError as e:
+            print(f"Não foi possível calcular AUC-ROC para multiclasse (one-vs-rest): {e}")
+            print("Isso pode acontecer se houver apenas uma classe presente em um batch ou no conjunto de teste.")
+
+    return results
