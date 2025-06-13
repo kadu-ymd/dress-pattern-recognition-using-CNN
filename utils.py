@@ -16,6 +16,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+device = torch.device("cpu")
+
 class CNNModel(nn.Module):
     """Classe destinada a criação do modelo de CNN a ser treinado e testado.
     """
@@ -185,7 +187,7 @@ def test_model(model: CNNModel, model_weights: str, test_loader: DataLoader):
 
     return result
 
-def test_model_full_metrics(model: CNNModel, model_weights_path: str, test_loader: DataLoader, class_names: list = None, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def test_model_full_metrics(model: CNNModel, model_weights_path: str, test_loader: DataLoader):
     """
     Testa o modelo com um determinado `test_loader` e calcula diversas métricas de classificação.
 
@@ -199,7 +201,7 @@ def test_model_full_metrics(model: CNNModel, model_weights_path: str, test_loade
     Returns:
         `results` (dict): Dicionário contendo várias métricas de desempenho do modelo.
     """
-    model.load_state_dict(torch.load(model_weights_path, map_location=device))
+    model.load_state_dict(torch.load(model_weights_path, map_location="cpu"))
 
     model.to(device)
 
